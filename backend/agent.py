@@ -1,17 +1,31 @@
-import google.generativeai as genai
+from openai import OpenAI
 import os
 
-print("API KEY FOUND:", bool(os.getenv("GEMINI_API_KEY")))
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if API_KEY:
-    genai.configure(api_key=API_KEY)
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+# FIX: Do NOT create the client at module level.
+# If CEREBRAS_API_KEY is missing, OpenAI() raises immediately and crashes
+# uvicorn before the app even starts. Create the client lazily inside the
+# function so the server boots fine; the error only surfaces when a request
+# is actually made (and is caught by the try/except below).
+_client = None
 
 
-def ask_gemini(content, query):
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("CEREBRAS_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "CEREBRAS_API_KEY environment variable is not set. "
+                "Run: export CEREBRAS_API_KEY=your_key_here"
+            )
+        _client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.cerebras.ai/v1"
+        )
+    return _client
+
+
+def ask_agent(content, query):
 
     prompt = f"""
 You are an Agentic AI Assistant.
@@ -67,16 +81,30 @@ Rules:
 
 10. Always provide clear, structured, and professional answers.
 
-11. Never return HTML tags like <br>, <table>, etc.
+11. Never return HTML tags.
 Use proper markdown formatting only.
 
 12. When comparing resumes:
-- Give comparison table
-- Strengths of each candidate
-- Weaknesses of each candidate
-- Final recommendation
+   - Comparison Table
+   - Strengths
+   - Weaknesses
+   - Recommendation
 """
 
-    response = model.generate_content(prompt)
+    try:
+        response = _get_client().chat.completions.create(
+            model="gpt-oss-120b",   # Current Cerebras production model (as of 2025)
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,
+            max_tokens=1500
+        )
 
-    return response.text
+        return response.choices[0].message.content
+
+    except Exception as e:
+        return f"Error: {str(e)}"

@@ -1,10 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
-google-generativeai
+openai
 pymupdf
-pillow
-youtube-transcript-api
-requests
-streamlit
 easyocr
+faster-whisper
+streamlit
+requests

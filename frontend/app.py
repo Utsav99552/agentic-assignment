@@ -1,12 +1,23 @@
 import streamlit as st
 import requests
 
+st.set_page_config(page_title="Agentic AI Assistant")
+
 st.title("Agentic AI Assistant")
 
 query = st.text_input("Enter Query")
 
-uploaded_files = st.file_uploader(
-    "Upload Files",
+# PDF / Image Upload
+document_files = st.file_uploader(
+    "Upload PDF / Images",
+    type=["pdf", "png", "jpg", "jpeg"],
+    accept_multiple_files=True
+)
+
+# Audio Upload
+audio_files = st.file_uploader(
+    "Upload Audio Files",
+    type=["mp3", "wav", "m4a"],
     accept_multiple_files=True
 )
 
@@ -14,32 +25,56 @@ if st.button("Run"):
 
     files = []
 
-    if uploaded_files:
-        for file in uploaded_files:
+    # PDF / Images
+    if document_files:
+        for file in document_files:
             files.append(
-                (
-                    "files",
-                    (
-                        file.name,
-                        file,
-                        file.type
-                    )
-                )
+                ("files", (file.name, file.getvalue(), file.type))
             )
 
-    response = requests.post(
-        "http://localhost:8000/chat",
-        data={"query": query},
-        files=files
-    )
+    # Audio
+    if audio_files:
+        for file in audio_files:
+            files.append(
+                ("files", (file.name, file.getvalue(), file.type))
+            )
 
-    result = response.json()
+    try:
+        response = requests.post(
+            "http://localhost:8000/chat",
+            data={"query": query},
+            files=files if files else None
+        )
 
-    st.subheader("Plan")
-    st.write(result.get("plan"))
+        # FIX: Check HTTP status before attempting to parse JSON.
+        # Previously, a 422 or 500 from FastAPI would cause an unhandled
+        # crash inside response.json() with a confusing error message.
+        if response.status_code != 200:
+            st.error(
+                f"Server error {response.status_code}: {response.text}"
+            )
+        else:
+            result = response.json()
 
-    st.subheader("Extracted Text")
-    st.write(result.get("extracted_text"))
+            st.subheader("Plan")
+            plan = result.get("plan", [])
+            st.write(", ".join(plan) if plan else "No files processed")
 
-    st.subheader("Answer")
-    st.write(result.get("answer"))
+            st.subheader("Extracted Text")
+            extracted = result.get("extracted_text", "").strip()
+            if extracted:
+                with st.expander("Show extracted text"):
+                    st.write(extracted)
+            else:
+                st.write("No text extracted")
+
+            st.subheader("Answer")
+            st.markdown(result.get("answer", "No answer returned"))
+
+    except requests.exceptions.ConnectionError:
+        st.error(
+            "Could not connect to the backend. "
+            "Make sure FastAPI is running on http://localhost:8000"
+        )
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
