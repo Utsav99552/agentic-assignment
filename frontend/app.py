@@ -4,7 +4,7 @@ import time
 
 st.set_page_config(page_title="Agentic AI Assistant")
 
-BACKEND_URL = "https://agentic-assignment-production.up.railway.app"
+BACKEND_URL = "https://agentic-assignment.onrender.com"
 
 st.title("Agentic AI Assistant")
 
