@@ -40,12 +40,11 @@ if st.button("Run"):
             )
 
     try:
-        # frontend/app.py  — change this line:
-    response = requests.post(
-    "https://agentic-assignment-production.up.railway.app/chat",  # ← your Railway URL
-    data={"query": query},
-    files=files if files else None
-)
+        response = requests.post(
+            "https://agentic-assignment-production.up.railway.app/chat",  # ← your Railway URL
+            data={"query": query},
+            files=files if files else None
+        )
 
         # FIX: Check HTTP status before attempting to parse JSON.
         # Previously, a 422 or 500 from FastAPI would cause an unhandled
